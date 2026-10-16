@@ -1,0 +1,499 @@
+[
+  {
+    "id": "1382c88ee6232ec0",
+    "type": "tab",
+    "label": "L02S_AoA",
+    "disabled": false,
+    "info": "",
+    "env": []
+  },
+  {
+    "id": "a72a4aa36cbf5b55",
+    "type": "mqtt in",
+    "z": "1382c88ee6232ec0",
+    "name": "",
+    "topic": "",
+    "qos": "2",
+    "datatype": "auto-detect",
+    "broker": "fab2cb4bc1d213cc",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 1,
+    "x": 430,
+    "y": 240,
+    "wires": [
+      [
+        "d31309864a9638bd"
+      ]
+    ]
+  },
+  {
+    "id": "d31309864a9638bd",
+    "type": "switch",
+    "z": "1382c88ee6232ec0",
+    "name": "",
+    "property": "topic",
+    "propertyType": "msg",
+    "rules": [
+      {
+        "t": "cont",
+        "v": "MKGW3",
+        "vt": "str"
+      },
+      {
+        "t": "cont",
+        "v": "cle",
+        "vt": "str"
+      }
+    ],
+    "checkall": "true",
+    "repair": false,
+    "outputs": 2,
+    "x": 510,
+    "y": 340,
+    "wires": [
+      [
+        "568ecda15e0a1430"
+      ],
+      [
+        "5d7b92fd7462fcdd"
+      ]
+    ]
+  },
+  {
+    "id": "568ecda15e0a1430",
+    "type": "split",
+    "z": "1382c88ee6232ec0",
+    "name": "",
+    "splt": "\\n",
+    "spltType": "str",
+    "arraySplt": 1,
+    "arraySpltType": "len",
+    "stream": false,
+    "addname": "",
+    "property": "payload.data",
+    "x": 670,
+    "y": 240,
+    "wires": [
+      [
+        "28c11b43a3a9c45e"
+      ]
+    ]
+  },
+  {
+    "id": "28c11b43a3a9c45e",
+    "type": "switch",
+    "z": "1382c88ee6232ec0",
+    "name": "",
+    "property": "msg.payload.data.mac",
+    "propertyType": "msg",
+    "rules": [
+      {
+        "t": "cont",
+        "v": "e406bfc12f13",
+        "vt": "str"
+      },
+      {
+        "t": "cont",
+        "v": "e406bfc13254",
+        "vt": "str"
+      }
+    ],
+    "checkall": "true",
+    "repair": false,
+    "outputs": 2,
+    "x": 810,
+    "y": 240,
+    "wires": [
+      [
+        "c08e7248b62d89b3"
+      ],
+      [
+        "c08e7248b62d89b3"
+      ]
+    ]
+  },
+  {
+    "id": "e708967643684fed",
+    "type": "split",
+    "z": "1382c88ee6232ec0",
+    "name": "",
+    "splt": "\\n",
+    "spltType": "str",
+    "arraySplt": 1,
+    "arraySpltType": "len",
+    "stream": false,
+    "addname": "",
+    "property": "topic",
+    "x": 390,
+    "y": 140,
+    "wires": [
+      [
+        "a72a4aa36cbf5b55"
+      ]
+    ]
+  },
+  {
+    "id": "24ccbf1679364efa",
+    "type": "inject",
+    "z": "1382c88ee6232ec0",
+    "name": "subscribe",
+    "props": [
+      {
+        "p": "topic",
+        "v": "[\"/MKGW3/+/send\",\"/cle/mqtt\"]",
+        "vt": "json"
+      },
+      {
+        "p": "action",
+        "v": "subscribe",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "x": 200,
+    "y": 140,
+    "wires": [
+      [
+        "e708967643684fed"
+      ]
+    ]
+  },
+  {
+    "id": "d5af7cbb6ca543c9",
+    "type": "inject",
+    "z": "1382c88ee6232ec0",
+    "name": "unsubscribe",
+    "props": [
+      {
+        "p": "topic",
+        "v": "[\"/MKGW3/+/send\",\"/cle/mqtt\"]",
+        "vt": "json"
+      },
+      {
+        "p": "action",
+        "v": "unsubscribe",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "x": 190,
+    "y": 240,
+    "wires": [
+      [
+        "e708967643684fed"
+      ]
+    ]
+  },
+  {
+    "id": "155f9cac71b6034e",
+    "type": "change",
+    "z": "1382c88ee6232ec0",
+    "name": "temperature",
+    "rules": [
+      {
+        "t": "set",
+        "p": "topic",
+        "pt": "msg",
+        "to": "payload.data.mac",
+        "tot": "msg"
+      },
+      {
+        "t": "set",
+        "p": "payload",
+        "pt": "msg",
+        "to": "{\t    \"mac\": msg.payload.data.mac,\t    \"temperature\": msg.payload.data.temperature\t}",
+        "tot": "jsonata"
+      }
+    ],
+    "action": "",
+    "property": "",
+    "from": "",
+    "to": "",
+    "reg": false,
+    "x": 950,
+    "y": 320,
+    "wires": [
+      [
+        "7ab09a51d91b5f4c"
+      ]
+    ]
+  },
+  {
+    "id": "c08e7248b62d89b3",
+    "type": "switch",
+    "z": "1382c88ee6232ec0",
+    "name": "",
+    "property": "payload.data.type",
+    "propertyType": "msg",
+    "rules": [
+      {
+        "t": "eq",
+        "v": "bxp-t/s",
+        "vt": "str"
+      }
+    ],
+    "checkall": "true",
+    "repair": false,
+    "outputs": 1,
+    "x": 1050,
+    "y": 240,
+    "wires": [
+      [
+        "155f9cac71b6034e"
+      ]
+    ]
+  },
+  {
+    "id": "5d7b92fd7462fcdd",
+    "type": "switch",
+    "z": "1382c88ee6232ec0",
+    "name": "",
+    "property": "payload.type",
+    "propertyType": "msg",
+    "rules": [
+      {
+        "t": "eq",
+        "v": "sensors",
+        "vt": "str"
+      }
+    ],
+    "checkall": "true",
+    "repair": false,
+    "outputs": 1,
+    "x": 650,
+    "y": 400,
+    "wires": [
+      [
+        "9c04d08b32b4fce4"
+      ]
+    ]
+  },
+  {
+    "id": "9c04d08b32b4fce4",
+    "type": "split",
+    "z": "1382c88ee6232ec0",
+    "name": "",
+    "splt": "\\n",
+    "spltType": "str",
+    "arraySplt": 1,
+    "arraySpltType": "len",
+    "stream": false,
+    "addname": "payload.data.mac",
+    "property": "payload.data",
+    "x": 790,
+    "y": 400,
+    "wires": [
+      [
+        "52973b24cb8ddddf"
+      ]
+    ]
+  },
+  {
+    "id": "52973b24cb8ddddf",
+    "type": "switch",
+    "z": "1382c88ee6232ec0",
+    "name": "",
+    "property": "msg.payload.data.mac",
+    "propertyType": "msg",
+    "rules": [
+      {
+        "t": "cont",
+        "v": "e406bfc12f13",
+        "vt": "str"
+      },
+      {
+        "t": "cont",
+        "v": "e406bfc13254",
+        "vt": "str"
+      }
+    ],
+    "checkall": "true",
+    "repair": false,
+    "outputs": 2,
+    "x": 970,
+    "y": 400,
+    "wires": [
+      [
+        "56d982326256d631"
+      ],
+      [
+        "56d982326256d631"
+      ]
+    ]
+  },
+  {
+    "id": "56d982326256d631",
+    "type": "change",
+    "z": "1382c88ee6232ec0",
+    "name": "X,Y,Z",
+    "rules": [
+      {
+        "t": "set",
+        "p": "topic",
+        "pt": "msg",
+        "to": "payload.data.mac",
+        "tot": "msg"
+      },
+      {
+        "t": "set",
+        "p": "payload",
+        "pt": "msg",
+        "to": "{\t    \"x\": msg.payload.data.x,\t    \"y\": msg.payload.data.y,\t    \"z\": msg.payload.data.z\t}",
+        "tot": "jsonata"
+      }
+    ],
+    "action": "",
+    "property": "",
+    "from": "",
+    "to": "",
+    "reg": false,
+    "x": 1130,
+    "y": 400,
+    "wires": [
+      [
+        "7ab09a51d91b5f4c"
+      ]
+    ]
+  },
+  {
+    "id": "7ab09a51d91b5f4c",
+    "type": "join",
+    "z": "1382c88ee6232ec0",
+    "name": "",
+    "mode": "custom",
+    "build": "merged",
+    "property": "payload",
+    "propertyType": "msg",
+    "key": "topic",
+    "joiner": "\\n",
+    "joinerType": "str",
+    "useparts": false,
+    "accumulate": true,
+    "timeout": "",
+    "count": "2",
+    "reduceRight": false,
+    "reduceExp": "",
+    "reduceInit": "",
+    "reduceInitType": "",
+    "reduceFixup": "",
+    "x": 1270,
+    "y": 280,
+    "wires": [
+      [
+        "3855fa35fdbd0952",
+        "59ad664d3594a699"
+      ]
+    ]
+  },
+  {
+    "id": "3855fa35fdbd0952",
+    "type": "debug",
+    "z": "1382c88ee6232ec0",
+    "name": "debug 11",
+    "active": false,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "false",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 1400,
+    "y": 340,
+    "wires": []
+  },
+  {
+    "id": "59ad664d3594a699",
+    "type": "function",
+    "z": "1382c88ee6232ec0",
+    "name": "Test Case Validation",
+    "func": "// L02S Test Case Validation Node\n// Place this node after the JOIN node\n\nlet p = msg.payload;\n\n// -----------------------------\n// 1. Test case configuration\n// -----------------------------\nlet testCaseId = flow.get(\"test_case_id\") || \"TC01\";\nlet testPhase = flow.get(\"test_phase\") || \"Basic SensorInfo Verification\";\n\n// Temperature limit for healthcare refrigerator use case\nlet tempMin = 0;\nlet tempMax = 6;\n\n// -----------------------------\n// 2. Refrigerator geofence area\n// Change these values based on your actual refrigerator/cold-zone coordinates\n// -----------------------------\nlet fridgeZone = {\n    x_min: 1.0,\n    x_max: 3.0,\n    y_min: 2.0,\n    y_max: 4.0,\n    z_min: 0.0,\n    z_max: 2.0\n};\n\n// -----------------------------\n// 3. Read final joined values\n// -----------------------------\nlet temperature = Number(p.temperature);\nlet x = Number(p.x);\nlet y = Number(p.y);\nlet z = Number(p.z);\n\n// -----------------------------\n// 4. Temperature check\n// -----------------------------\nlet temperatureStatus = \"UNKNOWN\";\nlet temperatureAlarm = false;\n\nif (!isNaN(temperature)) {\n    if (temperature >= tempMin && temperature <= tempMax) {\n        temperatureStatus = \"OK\";\n        temperatureAlarm = false;\n    } else if (temperature > tempMax) {\n        temperatureStatus = \"HIGH_TEMP\";\n        temperatureAlarm = true;\n    } else if (temperature < tempMin) {\n        temperatureStatus = \"LOW_TEMP\";\n        temperatureAlarm = true;\n    }\n}\n\n// -----------------------------\n// 5. Geofence check\n// -----------------------------\nlet insideFridgeZone = false;\n\nif (!isNaN(x) && !isNaN(y) && !isNaN(z)) {\n    insideFridgeZone =\n        x >= fridgeZone.x_min &&\n        x <= fridgeZone.x_max &&\n        y >= fridgeZone.y_min &&\n        y <= fridgeZone.y_max &&\n        z >= fridgeZone.z_min &&\n        z <= fridgeZone.z_max;\n}\n\nlet geofenceStatus = insideFridgeZone ? \"INSIDE\" : \"OUTSIDE\";\nlet geofenceAlarm = !insideFridgeZone;\n\n// -----------------------------\n// 6. Final test status\n// -----------------------------\nlet finalStatus = \"UNKNOWN\";\nlet alertMessage = \"\";\n\nif (temperatureAlarm && geofenceAlarm) {\n    finalStatus = \"CRITICAL\";\n    alertMessage = \"Tag is outside refrigerator zone and temperature is outside allowed range.\";\n} else if (temperatureAlarm) {\n    finalStatus = \"TEMP_ALERT\";\n    alertMessage = \"Temperature is outside allowed range.\";\n} else if (geofenceAlarm) {\n    finalStatus = \"GEOFENCE_ALERT\";\n    alertMessage = \"Tag is outside refrigerator zone.\";\n} else {\n    finalStatus = \"OK\";\n    alertMessage = \"Temperature and location are within expected range.\";\n}\n\n// -----------------------------\n// 7. Final output for debug / file / Excel report\n// -----------------------------\nmsg.payload = {\n    test_case_id: testCaseId,\n    test_phase: testPhase,\n\n    tag_mac: p.mac || msg.topic,\n\n    temperature_celsius: temperature,\n    temperature_min_limit: tempMin,\n    temperature_max_limit: tempMax,\n    temperature_status: temperatureStatus,\n    temperature_alarm: temperatureAlarm,\n\n    x: x,\n    y: y,\n    z: z,\n\n    geofence_zone: \"Refrigerator Zone\",\n    geofence_status: geofenceStatus,\n    geofence_alarm: geofenceAlarm,\n\n    final_status: finalStatus,\n    alert_message: alertMessage,\n\n    timestamp: new Date().toISOString()\n};\n\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1530,
+    "y": 220,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "a4e997f86b1c82d6",
+    "type": "debug",
+    "z": "1382c88ee6232ec0",
+    "name": "debug 13",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 1900,
+    "y": 380,
+    "wires": []
+  },
+  {
+    "id": "c105d63d2197f2a0",
+    "type": "file",
+    "z": "1382c88ee6232ec0",
+    "name": "Test Result",
+    "filename": "/data/mk107_calibration.ndjson",
+    "filenameType": "str",
+    "appendNewline": true,
+    "createDir": false,
+    "overwriteFile": "false",
+    "encoding": "none",
+    "x": 1690,
+    "y": 360,
+    "wires": [
+      [
+        "a4e997f86b1c82d6"
+      ]
+    ]
+  },
+  {
+    "id": "fab2cb4bc1d213cc",
+    "type": "mqtt-broker",
+    "name": "mqtt",
+    "broker": "<host>",
+    "port": "1883",
+    "clientid": "",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "4",
+    "keepalive": "60",
+    "cleansession": true,
+    "autoUnsubscribe": true,
+    "birthTopic": "",
+    "birthQos": "0",
+    "birthRetain": "false",
+    "birthPayload": "",
+    "birthMsg": {},
+    "closeTopic": "",
+    "closeQos": "0",
+    "closeRetain": "false",
+    "closePayload": "",
+    "closeMsg": {},
+    "willTopic": "",
+    "willQos": "0",
+    "willRetain": "false",
+    "willPayload": "",
+    "willMsg": {},
+    "userProps": "",
+    "sessionExpiry": ""
+  }
+]

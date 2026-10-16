@@ -1,0 +1,30 @@
+{
+  "site_id": "dynawo_office_01",
+  "map_frame": "office_map_v1",
+  "anchors": [
+    {
+      "anchor_id": "A1",
+      "gateway_mac": "d48c49f78ae4",
+      "x": 3.66,
+      "y": 4.58,
+      "z": 2.2,
+      "type": "gateway"
+    },
+    {
+      "anchor_id": "A2",
+      "gateway_mac": "142b2fe9b5fc",
+      "x": 5.73,
+      "y": -5.08,
+      "z": 2.2,
+      "type": "gateway"
+    },
+    {
+      "anchor_id": "A3",
+      "gateway_mac": "d48c49f6e2cc",
+      "x": -1.25,
+      "y": -1.01,
+      "z": 2.2,
+      "type": "gateway"
+    }
+  ]
+}

@@ -1,0 +1,115 @@
+[
+  {
+    "id": "slam_tab_clean",
+    "type": "tab",
+    "label": "SLAM Clean Export",
+    "disabled": false
+  },
+  {
+    "id": "slam_inject",
+    "type": "inject",
+    "z": "slam_tab_clean",
+    "name": "SLAM Trigger ",
+    "props": [],
+    "repeat": "0.5",
+    "crontab": "",
+    "once": true,
+    "onceDelay": "0.5",
+    "topic": "",
+    "x": 140,
+    "y": 100,
+    "wires": [
+      [
+        "slam_http"
+      ]
+    ]
+  },
+  {
+    "id": "slam_http",
+    "type": "http request",
+    "z": "slam_tab_clean",
+    "name": "Get SLAM Position",
+    "method": "GET",
+    "ret": "obj",
+    "paytoqs": "ignore",
+    "url": "http://<host>:8081/deephub/v2/providers/v2p_000x/location?crs=local&zone_id=<zone-id>",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "insecureHTTPParser": false,
+    "authType": "",
+    "senderr": false,
+    "headers": [],
+    "x": 380,
+    "y": 100,
+    "wires": [
+      [
+        "slam_format"
+      ]
+    ]
+  },
+  {
+    "id": "slam_format",
+    "type": "function",
+    "z": "slam_tab_clean",
+    "name": "SLAM → NDJSON Formatter",
+    "func": "let run_id = flow.get(\"run_id\") || \"20260430_ABC_SLOW1_T28_Round\";\n\nlet data = msg.payload;\n\nif (!data || !data.position || !data.position.coordinates) {\n    return null;\n}\n\nlet x = data.position.coordinates[0];\nlet y = data.position.coordinates[1];\nlet yaw = data.properties?.yaw || 0;\n\nlet ts = data.timestamp_generated;\n\nmsg.payload = JSON.stringify({\n    ts: ts,\n    run_id: run_id,\n    tag_id: \"T1\",\n    x: x,\n    y: y,\n    z: 0,\n    yaw: yaw,\n    source: \"lidar_slam\"\n});\n\nreturn msg;",
+    "outputs": 1,
+    "timeout": "",
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 660,
+    "y": 100,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "slam_file",
+    "type": "file",
+    "z": "slam_tab_clean",
+    "name": "Save Ground Truth",
+    "filename": "/data/ground_truth.ndjson",
+    "filenameType": "str",
+    "appendNewline": true,
+    "createDir": false,
+    "overwriteFile": "false",
+    "encoding": "utf8",
+    "x": 1070,
+    "y": 240,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "slam_debug",
+    "type": "debug",
+    "z": "slam_tab_clean",
+    "name": "SLAM Debug",
+    "active": true,
+    "tosidebar": true,
+    "complete": "payload",
+    "x": 810,
+    "y": 300,
+    "wires": []
+  },
+  {
+    "id": "991361e902f5322c",
+    "type": "file",
+    "z": "slam_tab_clean",
+    "name": "Save Ground Truth",
+    "filename": "/data/ground_truth_02.ndjson",
+    "filenameType": "str",
+    "appendNewline": true,
+    "createDir": false,
+    "overwriteFile": "false",
+    "encoding": "utf8",
+    "x": 970,
+    "y": 100,
+    "wires": [
+      []
+    ]
+  }
+]

@@ -1,0 +1,622 @@
+[
+  {
+    "id": "7274cbf01baf4687",
+    "type": "tab",
+    "label": "MKGW4 (sensor)",
+    "disabled": false,
+    "info": "",
+    "env": []
+  },
+  {
+    "id": "0b6f08d80b0b884a",
+    "type": "mqtt in",
+    "z": "7274cbf01baf4687",
+    "name": "MKGW4-report",
+    "topic": "/MKGW4/c33ef91c9c9e/send",
+    "qos": "1",
+    "datatype": "auto-detect",
+    "broker": "94772904314c5aef",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 200,
+    "y": 320,
+    "wires": [
+      [
+        "fb37ecede9eac98a",
+        "d805e52e6d1a7d53"
+      ]
+    ]
+  },
+  {
+    "id": "721f51b9cc9380d1",
+    "type": "change",
+    "z": "7274cbf01baf4687",
+    "name": "prepare gateway omlox",
+    "rules": [
+      {
+        "t": "set",
+        "p": "method",
+        "pt": "msg",
+        "to": "PUT",
+        "tot": "str"
+      },
+      {
+        "t": "set",
+        "p": "url",
+        "pt": "msg",
+        "to": "$flowContext('omlox_api_url') & '/providers/' & msg.payload.mac & '/location'",
+        "tot": "jsonata"
+      },
+      {
+        "t": "set",
+        "p": "payload",
+        "pt": "msg",
+        "to": "\t{\t  \"position\": {\t    \"type\": \"Point\",\t    \"coordinates\": [\t      msg.payload.longitude,\t      msg.payload.latitude\t    ]\t  },\t  \"source\":$flowContext('omlox_zoneId'),\t  \"provider_type\": \"gps\",\t  \"provider_id\": msg.payload.mac,\t  \"crs\": \"EPSG:4326\",\t  \"floor\": 0\t}\t",
+        "tot": "jsonata"
+      }
+    ],
+    "action": "",
+    "property": "",
+    "from": "",
+    "to": "",
+    "reg": false,
+    "x": 1150,
+    "y": 440,
+    "wires": [
+      [
+        "a4fc87bcabc0d365"
+      ]
+    ]
+  },
+  {
+    "id": "fb37ecede9eac98a",
+    "type": "function",
+    "z": "7274cbf01baf4687",
+    "name": "ByteParser: Commands",
+    "func": "const buf = msg.payload;\n\nconst header = buf.readUInt8(0);\nif (header == 0xef){\n    const command = buf.readUInt16BE(1);\n    // const mac = buf.slice(3, 9).toString('hex');\n    const mac = buf.toString('hex', 3, 9);\n    let length = buf.readUInt16BE(9);\n    const data = buf.slice(11, 11+length);\n    return {        \n        payload: {\n            header: header,\n            command: command,\n            mac:mac,\n            length:length+0,\n            data: data\n        }\n    };\n}\n\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 390,
+    "y": 400,
+    "wires": [
+      [
+        "1ea975d81d8218ff",
+        "b150068af03b8100"
+      ]
+    ]
+  },
+  {
+    "id": "2c90a8bc10f9c298",
+    "type": "function",
+    "z": "7274cbf01baf4687",
+    "name": "GNSS",
+    "func": "const buf = msg.payload.data;\nconst length = msg.payload.length;\nlet index = 0;\nlet timestamp, fixMode, fixResult, lng, lat, ac, cid;\nwhile (index < length) {\n    const tag = buf.readUInt8(index);\n    const segLens = buf.readUInt16BE(index + 1)\n    index += 3;\n    switch (tag) {\n        // timestamp\n        case 0x0:\n            timestamp = buf.readUInt32BE(index);\n            index += segLens;\n            continue;\n\n        // fix mode\n        case 0x1:\n            fixMode = buf.readUInt8(index);\n            index += segLens;\n            continue;\n\n        // fix result\n        case 0x2:\n            fixResult = buf.readUInt8(index);\n            index += segLens;\n            continue;\n\n        // lng,lat\n        case 0x3:\n            lng = buf.readInt32BE(index) * 0.0000001;\n            lat = buf.readInt32BE(index + 4) * 0.0000001;\n            index += segLens;\n            continue;\n\n        // lbs\n        case 0x4:\n            ac = buf.readUInt16BE(index);\n            cid = buf.readUInt32BE(index + 2);\n            index += segLens;\n            continue;\n    }\n}\n\nswitch (fixMode) {\n    case 0:\n        return {\n            payload: {\n                mac: msg.payload.mac,\n                mode: 'GPS',\n                timestamp: timestamp,\n                fixResult: fixResult,\n                longitude: lng,\n                latitude: lat\n            }\n        }\n    case 1:\n        return {\n            payload: {\n                mac: msg.payload.mac,\n                mode: 'LBS',\n                timestamp: timestamp,\n                fixResult: fixResult,\n                areaCode: ac,\n                cellID: cid\n            }\n        }\n\n}",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 750,
+    "y": 440,
+    "wires": [
+      [
+        "684c3868b0e86208"
+      ]
+    ]
+  },
+  {
+    "id": "1ea975d81d8218ff",
+    "type": "switch",
+    "z": "7274cbf01baf4687",
+    "name": "Select by Command",
+    "property": "payload.command",
+    "propertyType": "msg",
+    "rules": [
+      {
+        "t": "eq",
+        "v": "0x3004",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "0X3006",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "0X3010",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "0X3011",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "0X3014",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "0X3032",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "0X3089",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "0X30a0",
+        "vt": "str"
+      }
+    ],
+    "checkall": "true",
+    "repair": false,
+    "outputs": 8,
+    "x": 500,
+    "y": 560,
+    "wires": [
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [
+        "2c90a8bc10f9c298"
+      ],
+      [
+        "0a046b01234fd5ab"
+      ]
+    ]
+  },
+  {
+    "id": "0a046b01234fd5ab",
+    "type": "function",
+    "z": "7274cbf01baf4687",
+    "name": "Beacon",
+    "func": "const BEACON_TYPE = {\n    0: \"iBeacon\",\n    1: \"Eddystone-UID\",\n    2: \"Eddystone-URL\",\n    3: \"Eddystone-TLM\",\n    4: \"BXP-Device info\",\n    5: \"BXP-ACC\",\n    6: \"BXP-TH\",\n    7: \"BXP-Button\",\n    8: \"BXP-Tag\",\n    9: \"PIR\",\n    10:\"Nano Beacon\",\n    11: \"Other type\",\n    12: \"TOF\"\n};\n\nconst whitelist = {\n    \"c647b7b8e4d0\": 1,\n    \"c2e170c50436\": 1,\n    \"7c31faa3f6d9\": 1,\n};\n\nconst beacons = [];\nconst buf = msg.payload.data;\nconst length = msg.payload.length;\n\nlet index = 0;\n\nlet beaconType, beaconMac, beaconConnectable, timestamp, timezone, rssi, bleAdv, bleResp;\n\nfunction resetRecord() {\n    beaconType = undefined;\n    beaconMac = undefined;\n    beaconConnectable = undefined;\n    timestamp = undefined;\n    timezone = undefined;\n    rssi = undefined;\n    bleAdv = undefined;\n    bleResp = undefined;\n}\n\nfunction pushRecord() {\n    if (!beaconMac || !whitelist[beaconMac] ) return;\n    \n    beacons.push({\n        macGateway: msg.payload.mac,\n        macBeacon: beaconMac,\n        beaconTypeCode: beaconType,\n        beaconType: BEACON_TYPE[beaconType] || beaconType,\n        beaconConnectable: beaconConnectable,\n        timestamp: timestamp,\n        timezone: timezone,\n        rssi: rssi,\n        bleAdv: bleAdv,\n        bleResp: bleResp\n    });\n}\n\nresetRecord();\n\nwhile (index < length) {\n    const tag = buf.readUInt8(index);\n    const segLens = buf.readUInt16BE(index + 1);\n    index += 3;\n\n    if (index + segLens > length) break;\n\n    switch (tag) {\n        case 0x00: // start new record\n            pushRecord();\n            resetRecord();\n            if (segLens >= 1) beaconType = buf.readUInt8(index);\n            index += segLens;\n            continue;\n\n        case 0x01: // mac\n            beaconMac = buf.toString(\"hex\", index, index + segLens).toLowerCase();\n            index += segLens;\n            continue;\n\n        case 0x02: // connectable\n            if (segLens >= 1) beaconConnectable = buf.readUInt8(index);\n            index += segLens;\n            continue;\n\n        case 0x03: // timestamp + timezone\n            if (segLens >= 5) {\n                timestamp = buf.readUInt32BE(index);\n                timezone = buf.readUInt8(index + 4);\n            }\n            index += segLens;\n            continue;\n\n        case 0x04: // rssi\n            if (segLens >= 1) rssi = buf.readInt8(index);\n            index += segLens;\n            continue;\n\n        case 0x05: // adv raw\n            bleAdv = buf.toString(\"hex\", index, index + segLens).toLowerCase();\n            index += segLens;\n            continue;\n\n        case 0x06: // resp raw\n            bleResp = buf.toString(\"hex\", index, index + segLens).toLowerCase();\n            index += segLens;\n            continue;\n\n        default:\n            \n            index += segLens;\n            continue;\n    }\n}\n\npushRecord();\n\nmsg.payload = beacons.filter(b => b.macBeacon && (b.bleAdv || b.bleResp));\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 760,
+    "y": 520,
+    "wires": [
+      [
+        "b9f41fb766875a00"
+      ]
+    ]
+  },
+  {
+    "id": "684c3868b0e86208",
+    "type": "switch",
+    "z": "7274cbf01baf4687",
+    "name": "GPS fix",
+    "property": "payload.mode",
+    "propertyType": "msg",
+    "rules": [
+      {
+        "t": "eq",
+        "v": "GPS",
+        "vt": "str"
+      }
+    ],
+    "checkall": "true",
+    "repair": false,
+    "outputs": 1,
+    "x": 920,
+    "y": 440,
+    "wires": [
+      [
+        "721f51b9cc9380d1",
+        "6d32b676b0e1c7ab"
+      ]
+    ]
+  },
+  {
+    "id": "6d32b676b0e1c7ab",
+    "type": "change",
+    "z": "7274cbf01baf4687",
+    "name": "Set Flow coordinate",
+    "rules": [
+      {
+        "t": "set",
+        "p": "longitude",
+        "pt": "flow",
+        "to": "payload.longitude",
+        "tot": "msg"
+      },
+      {
+        "t": "set",
+        "p": "latitude",
+        "pt": "flow",
+        "to": "payload.latitude",
+        "tot": "msg"
+      }
+    ],
+    "action": "",
+    "property": "",
+    "from": "",
+    "to": "",
+    "reg": false,
+    "x": 1160,
+    "y": 360,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "b9f41fb766875a00",
+    "type": "split",
+    "z": "7274cbf01baf4687",
+    "name": "split",
+    "splt": "\\n",
+    "spltType": "str",
+    "arraySplt": 1,
+    "arraySpltType": "len",
+    "stream": false,
+    "addname": "",
+    "property": "payload",
+    "x": 850,
+    "y": 600,
+    "wires": [
+      [
+        "2f08a3160a707a08"
+      ]
+    ]
+  },
+  {
+    "id": "586baf21044c41cc",
+    "type": "inject",
+    "z": "7274cbf01baf4687",
+    "name": "Init",
+    "props": [],
+    "repeat": "",
+    "crontab": "",
+    "once": true,
+    "onceDelay": 0.1,
+    "topic": "",
+    "x": 290,
+    "y": 240,
+    "wires": [
+      [
+        "dd5725081b9470b4"
+      ]
+    ]
+  },
+  {
+    "id": "dd5725081b9470b4",
+    "type": "change",
+    "z": "7274cbf01baf4687",
+    "name": "Set flow variables",
+    "rules": [
+      {
+        "t": "set",
+        "p": "longitude",
+        "pt": "flow",
+        "to": "8.38454",
+        "tot": "str"
+      },
+      {
+        "t": "set",
+        "p": "latitude",
+        "pt": "flow",
+        "to": "48.9374233",
+        "tot": "str"
+      },
+      {
+        "t": "set",
+        "p": "omlox_api_url",
+        "pt": "flow",
+        "to": "http://<host>:8081/deephub/v2",
+        "tot": "str"
+      },
+      {
+        "t": "set",
+        "p": "omlox_zoneId",
+        "pt": "flow",
+        "to": "<id>",
+        "tot": "str"
+      }
+    ],
+    "action": "",
+    "property": "",
+    "from": "",
+    "to": "",
+    "reg": false,
+    "x": 470,
+    "y": 240,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "2f08a3160a707a08",
+    "type": "function",
+    "z": "7274cbf01baf4687",
+    "name": "decode beacon",
+    "func": "const p = msg.payload;\nconst adv = String(p.bleAdv || \"\").toLowerCase();\nconst resp = String(p.bleResp || \"\").toLowerCase();\n\np.frameClass = \"UNKNOWN\";\np.sensorType = \"UNKNOWN\";\np.sensorValues = {};\n\n\n// -------------------------------------------------------------\n// 2) H4 Pro (BXP‑TH) — Frame type 0x70\n// -------------------------------------------------------------\nif (adv.includes(\"abfe70\")) {\n    p.frameClass = \"BXP-TH\";\n    p.sensorType = \"H4_PRO\";\n\n    const idx = adv.indexOf(\"abfe70\");\n    const buf = Buffer.from(adv.slice(idx + 6), \"hex\");\n\n    if (buf.length >= 8) {\n        // ONLY temp, humidity, battery\n        p.sensorValues['temperature'] = buf.readInt16BE(2) / 10;\n        p.sensorValues['humidity'] = buf.readUInt16BE(4) / 10;\n    }\n}\n\n// -------------------------------------------------------------\n// 3) MK PIR Series (Company ID 0x0A62) → S03D\n// -------------------------------------------------------------\nelse if (adv.includes(\"0a62\")) {\n    p.frameClass = \"PIR\";\n    p.sensorType = \"S03D\";\n\n    const idx = adv.indexOf(\"0a62\");\n    const buf = Buffer.from(adv.slice(idx + 4), \"hex\");\n\n    if (buf.length >= 23) {\n        const status = buf.readUInt8(2);\n        p.sensorValues['doorOpen'] = (((status >> 3) & 0x01) === 1);\n    }\n}\n\n// -------------------------------------------------------------\n// 4) S05T (BXP_SENSOR_INFO 0x1601EA80)\n// -------------------------------------------------------------\nelse if (adv.includes(\"1601ea80\")) {\n    const idx = adv.indexOf(\"1601ea80\");\n    const buf = Buffer.from(adv.slice(idx + 8), \"hex\");\n\n    if (buf.length >= 17) {\n        const status = buf.readUInt8(0);\n        const doorOpen = (status & 0x01) === 1;\n        const tempEquipped = ((status >> 3) & 0x01) === 1;\n        const battRaw = buf.readUInt16BE(15);\n\n        if (doorOpen) {\n            // S03D mode inside S05T frame\n            p.frameClass = \"BXP_SENSOR_INFO\";\n            p.sensorType = \"S03D\";\n            p.sensorValues['doorOpen'] = doorOpen;\n        } else {\n            \n            p.frameClass = \"BXP_SENSOR_INFO\";\n            p.sensorType = \"S05T\";\n            p.sensorValues = {\n                temperature: tempEquipped ? buf.readInt16BE(11) / 10 : null,\n            };\n        }\n    }\n}\n\n// -------------------------------------------------------------\n// 5) iBeacon / Eddystone\n// -------------------------------------------------------------\nelse if ([\"ibeacon\", \"eddystone-uid\", \"eddystone-url\", \"eddystone-tlm\"].includes(p.beaconType)) {\n    p.sensorType = \"N1\";\n    p.frameClass = p.beaconType;\n    p.sensorValues = { frame: p.beaconType };\n}\n\n// -------------------------------------------------------------\n// 6) Fallback\n// -------------------------------------------------------------\nelse {\n    // p.sensorValues = {\n    //     beaconType: p.beaconType,\n    //     beaconTypeCode: p.beaconTypeCode,\n    //     rawAdv: p.bleAdv,\n    //     rawResp: p.bleResp\n    // };\n    return null;\n}\n\nmsg.payload = p;\nreturn msg;\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1020,
+    "y": 600,
+    "wires": [
+      [
+        "a2b3f01e53769ad0",
+        "74e03d2a4bf173e2"
+      ]
+    ]
+  },
+  {
+    "id": "a2b3f01e53769ad0",
+    "type": "function",
+    "z": "7274cbf01baf4687",
+    "name": "Location Update (S05T)",
+    "func": "function mask_geolocation(lat, long) {\n    const min = -0.000005;\n    const max = 0.000005;\n\n    return {\n        latitude: lat + Math.random() * (max - min) + min,\n        longitude: long + Math.random() * (max - min) + min\n    };\n}\n\n// --- Input ---\nconst p = msg.payload;\n\nif (!p.macBeacon) {\n    node.warn(\"macBeacon missing\");\n    return null;\n}\n\nif (p.sensorType == 'S05T') {\n    const masked = mask_geolocation(flow.get('latitude'), flow.get('longitude'));\n\n    msg.method = \"PUT\";\n    msg.url = `${flow.get('omlox_api_url')}/providers/${encodeURIComponent(p.macBeacon)}/location`;\n    msg.headers = {\n        \"Accept\": \"application/json\",\n        \"Content-Type\": \"application/json\",\n        \"Authorization\": \"Bearer <token>\"\n    };\n    const now = new Date().toISOString();\n\n    msg.payload = {\n        position: {\n            type: \"Point\",\n            coordinates: [masked.longitude, masked.latitude]\n        },\n\n        source: flow.get('omlox_zoneId'),\n        provider_type: \"ibeacon\",\n        provider_id: p.macBeacon,\n\n        timestamp_generated: now,\n        timestamp_sent: now,\n\n        crs: \"EPSG:4326\",\n\n        // Optional but lightweight defaults\n        floor: 0,\n        properties: {\n            gatewayPos: {\n                latitude: flow.get('latitude'),\n                longitude: flow.get('longitude')\n            }\n        }\n    };\n\n    return msg;\n}\n\nreturn null;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1430,
+    "y": 760,
+    "wires": [
+      [
+        "a4fc87bcabc0d365"
+      ]
+    ]
+  },
+  {
+    "id": "a4fc87bcabc0d365",
+    "type": "http request",
+    "z": "7274cbf01baf4687",
+    "name": "",
+    "method": "use",
+    "ret": "txt",
+    "paytoqs": "ignore",
+    "url": "",
+    "tls": "",
+    "persist": true,
+    "proxy": "",
+    "insecureHTTPParser": false,
+    "authType": "",
+    "senderr": false,
+    "headers": [],
+    "x": 1790,
+    "y": 600,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "835e0e6ffdd7d40c",
+    "type": "http request",
+    "z": "7274cbf01baf4687",
+    "name": "",
+    "method": "PUT",
+    "ret": "txt",
+    "paytoqs": "ignore",
+    "url": "http://<host>:8081/deephub/trackable/<id>/sensors",
+    "tls": "",
+    "persist": true,
+    "proxy": "",
+    "insecureHTTPParser": false,
+    "authType": "",
+    "senderr": false,
+    "headers": [],
+    "x": 2490,
+    "y": 1240,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "0e2e2146d8e290b5",
+    "type": "change",
+    "z": "7274cbf01baf4687",
+    "name": "Sensors Update (S05T)",
+    "rules": [
+      {
+        "t": "set",
+        "p": "url",
+        "pt": "msg",
+        "to": "$flowContext('omlox_api_url') & '/providers/' & msg.payload.macBeacon & '/sensors'",
+        "tot": "jsonata"
+      },
+      {
+        "t": "set",
+        "p": "method",
+        "pt": "msg",
+        "to": "PUT",
+        "tot": "str"
+      },
+      {
+        "t": "set",
+        "p": "payload",
+        "pt": "msg",
+        "to": "payload.sensorValues",
+        "tot": "msg"
+      }
+    ],
+    "action": "",
+    "property": "",
+    "from": "",
+    "to": "",
+    "reg": false,
+    "x": 1450,
+    "y": 600,
+    "wires": [
+      [
+        "a4fc87bcabc0d365"
+      ]
+    ]
+  },
+  {
+    "id": "74e03d2a4bf173e2",
+    "type": "switch",
+    "z": "7274cbf01baf4687",
+    "name": "",
+    "property": "payload.sensorType",
+    "propertyType": "msg",
+    "rules": [
+      {
+        "t": "eq",
+        "v": "S05T",
+        "vt": "str"
+      },
+      {
+        "t": "neq",
+        "v": "S05T",
+        "vt": "str"
+      }
+    ],
+    "checkall": "true",
+    "repair": false,
+    "outputs": 2,
+    "x": 1230,
+    "y": 600,
+    "wires": [
+      [
+        "0e2e2146d8e290b5"
+      ],
+      [
+        "eab679325f5ca07d",
+        "de973d20ef9075b7"
+      ]
+    ]
+  },
+  {
+    "id": "eab679325f5ca07d",
+    "type": "function",
+    "z": "7274cbf01baf4687",
+    "name": "Join Sensor Values",
+    "func": "if (!msg.payload.sensorValues) \n    return null;\n\nvar gatewaySensors = flow.get('gatewaySensors') ? flow.get('gatewaySensors') : {};\nfor (const [key, value] of Object.entries(msg.payload.sensorValues)) {\n    gatewaySensors[key] = value;\n}\nflow.set('gatewaySensors', gatewaySensors)\n\nmsg.method = 'PUT';\nmsg.url = `${flow.get('omlox_api_url')}/providers/${msg.payload.macGateway}/sensors`\nmsg.payload = gatewaySensors;\n\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1430,
+    "y": 680,
+    "wires": [
+      [
+        "a4fc87bcabc0d365",
+        "53ee790c6e3cfb88"
+      ]
+    ]
+  },
+  {
+    "id": "53ee790c6e3cfb88",
+    "type": "debug",
+    "z": "7274cbf01baf4687",
+    "name": "debug 12",
+    "active": false,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "false",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 1690,
+    "y": 680,
+    "wires": []
+  },
+  {
+    "id": "de973d20ef9075b7",
+    "type": "debug",
+    "z": "7274cbf01baf4687",
+    "name": "debug 16",
+    "active": false,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "false",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 1220,
+    "y": 880,
+    "wires": []
+  },
+  {
+    "id": "b150068af03b8100",
+    "type": "debug",
+    "z": "7274cbf01baf4687",
+    "name": "debug 33",
+    "active": false,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "false",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 640,
+    "y": 340,
+    "wires": []
+  },
+  {
+    "id": "d805e52e6d1a7d53",
+    "type": "debug",
+    "z": "7274cbf01baf4687",
+    "name": "debug 19",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "false",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 50,
+    "y": 660,
+    "wires": []
+  },
+  {
+    "id": "94772904314c5aef",
+    "type": "mqtt-broker",
+    "name": "Moko",
+    "broker": "<host>",
+    "port": "1883",
+    "clientid": "",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "4",
+    "keepalive": "60",
+    "cleansession": true,
+    "autoUnsubscribe": true,
+    "birthTopic": "",
+    "birthQos": "0",
+    "birthRetain": "false",
+    "birthPayload": "",
+    "birthMsg": {},
+    "closeTopic": "",
+    "closeQos": "0",
+    "closeRetain": "false",
+    "closePayload": "",
+    "closeMsg": {},
+    "willTopic": "",
+    "willQos": "0",
+    "willRetain": "false",
+    "willPayload": "",
+    "willMsg": {},
+    "userProps": "",
+    "sessionExpiry": ""
+  }
+]

@@ -1,0 +1,747 @@
+[
+  {
+    "id": "tab_rtls",
+    "type": "tab",
+    "label": "RTLS Data Pipeline",
+    "disabled": false
+  },
+  {
+    "id": "2afad9054c119597",
+    "type": "mqtt in",
+    "z": "tab_rtls",
+    "name": "MKGW3 IN",
+    "topic": "/MKGW3/+/send",
+    "qos": "2",
+    "datatype": "auto-detect",
+    "broker": "fab2cb4bc1d213cc",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 710,
+    "y": 480,
+    "wires": [
+      [
+        "d79bdc1735c048b0",
+        "eb31fd6f9f3a3cbc"
+      ]
+    ]
+  },
+  {
+    "id": "a0c25d2ce444327a",
+    "type": "function",
+    "z": "tab_rtls",
+    "name": "Whitelist Tags",
+    "func": "\nconst allowedTags = [\n\"cac90c39716b\",\"e7a7b4d9517c\",\"d4a9cc1e7dfc\",\"d3b51b7c9938\",\n\"d9fe7394b8eb\",\"fc0e55cbcc75\",\"dfe380cd5d93\",\"c647b7b8e4d0\",\n\"cc8c6d957d8c\",\"d805e2a1aa46\",\"c9cc0df57440\",\n\"e406bfa72994\",\"e406bfa729a6\",\"e406bfa71fde\",\"e406bfa720d7\",\n\"e406bfc13c78\",\"e406bfc13cbc\",\"e406bfc12f13\",\"e406bfc13254\",\n\"6cfd22769b7c\",\"ecc4689f162b\",\"f47f5bcc9fed\",\"f912b2820e43\",\n\"e406bfc1eb03\",\"e406bfc1e0f1\",\"e406bfc1e121\",\n\"f86ae1cecef8\"\n];\n\nmsg.payload = msg.payload.filter(p => \n    allowedTags.includes(p.tag_mac)\n);\n\nreturn msg.payload.length ? msg : null;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1200,
+    "y": 440,
+    "wires": [
+      [
+        "d89c3de31a7117c8"
+      ]
+    ]
+  },
+  {
+    "id": "d89c3de31a7117c8",
+    "type": "function",
+    "z": "tab_rtls",
+    "name": "Anchor validation",
+    "func": "const anchors = {\n    \"d48c49f78ae4\": { id: \"A1\", x: 3.96, y: 6.18 },\n    \"142b2fe9b5fc\": { id: \"A2\", x: 4.60, y: -6.15 },\n    \"d48c49f6e2cc\": { id: \"A3\", x: -1.14, y: -1.01 },\n    \"007007e0b8f0\": { id: \"A4\", x: -1.04, y: -1.01 },\n    \"2805a55f9a7c\": { id: \"A5\", x: -1.24, y: -1.01 }\n};\n\nmsg.payload = msg.payload.map(p => {\n    let a = anchors[p.gateway_mac];\n    if (!a) return null;\n\n    return {\n        tag_mac: p.tag_mac,\n        ts: p.ts,\n        anchor_id: a.id,\n        rssi: p.rssi\n    };\n}).filter(Boolean);\n\nreturn msg.payload.length ? msg : null;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1490,
+    "y": 440,
+    "wires": [
+      [
+        "165dcaa802727139"
+      ]
+    ]
+  },
+  {
+    "id": "9118cbe720e73bf0",
+    "type": "debug",
+    "z": "tab_rtls",
+    "name": "debug 17",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 2400,
+    "y": 260,
+    "wires": []
+  },
+  {
+    "id": "165dcaa802727139",
+    "type": "function",
+    "z": "tab_rtls",
+    "name": "Aggregation",
+    "func": "let store = flow.get(\"agg_store\") || {};\nlet WINDOW = 1000; // 1 second\n\n// ensure array\nlet data = msg.payload;\nif (!Array.isArray(data)) data = [data];\n\n// ===== STORE DATA =====\ndata.forEach(p => {\n\n    let tag = p.tag_mac;\n    let timeBucket = Math.floor(p.ts / WINDOW) * WINDOW;\n\n    if (!store[tag]) store[tag] = {};\n    if (!store[tag][timeBucket]) store[tag][timeBucket] = [];\n\n\n    store[tag][timeBucket].push({\n        anchor_id: p.anchor_id,\n        x: p.x,\n        y: p.y,\n        rssi: p.rssi,\n        source: p.source\n    });\n});\n\n// ===== CLEANUP + OUTPUT =====\nlet now = Date.now();\nlet output = [];\n\nObject.keys(store).forEach(tag => {\n\n    Object.keys(store[tag]).forEach(t => {\n\n        let tNum = parseInt(t, 10);\n\n        if (!isNaN(tNum) && now - tNum > WINDOW) {\n\n            let anchors = store[tag][t];\n\n            if (anchors.length >= 1) {\n                output.push({\n                    tag_mac: tag,\n                    ts: tNum,\n                    anchors: anchors\n                });\n            }\n\n            delete store[tag][t];\n        }\n\n    });\n\n});\n\n\nflow.set(\"agg_store\", store);\n\nif (output.length === 0) return null;\n\nmsg.payload = output;\nreturn msg;\n\n\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1730,
+    "y": 440,
+    "wires": [
+      [
+        "462ea171bbf16ba0"
+      ]
+    ]
+  },
+  {
+    "id": "462ea171bbf16ba0",
+    "type": "function",
+    "z": "tab_rtls",
+    "name": "Final Data Set Formatter",
+    "func": "const tagMap = {\n    \"cac90c39716b\": \"T1\",\n    \"e7a7b4d9517c\": \"T2\",\n    \"d4a9cc1e7dfc\": \"T3\",\n    \"d3b51b7c9938\": \"T4\",\n    \"d9fe7394b8eb\": \"T5\",\n    \"fc0e55cbcc75\": \"T6\",\n    \"dfe380cd5d93\": \"T7\",\n    \"c647b7b8e4d0\": \"T8\",\n    \"cc8c6d957d8c\": \"T9\",\n    \"d805e2a1aa46\": \"T10\",\n    \"c9cc0df57440\": \"T11\",\n    \"e406bfa72994\": \"T12\",\n    \"e406bfa729a6\": \"T13\",\n    \"e406bfa71fde\": \"T14\",\n    \"e406bfa720d7\": \"T15\",\n    \"e406bfc13c78\": \"T16\",\n    \"e406bfc13cbc\": \"T17\",\n    \"e406bfc12f13\": \"T18\",\n    \"e406bfc13254\": \"T19\",\n    \"6cfd22769b7c\": \"T20\",\n    \"ecc4689f162b\": \"T21\",\n    \"f47f5bcc9fed\": \"T22\",\n    \"f912b2820e43\": \"T23\",\n    \"e406bfc1eb03\": \"T24\",\n    \"e406bfc1e0f1\": \"T25\",\n    \"e406bfc1e121\": \"T26\",\n    \"f86ae1cecef8\": \"T27\"\n};\n\nlet seq = flow.get(\"seq\") || 0;\nlet run_id = flow.get(\"run_id\") || \"20260430_ABC_SLOW2_T27_Round\";\n\nlet output = [];\n\nmsg.payload.forEach(entry => {\n\n    let tag_id = tagMap[entry.tag_mac] || entry.tag_mac;\n\n    entry.anchors.forEach(a => {\n\n        seq++;\n\n        output.push(JSON.stringify({\n            ts_gateway: new Date(entry.ts).toISOString(),\n            run_id: run_id,\n            gateway_id: \"GW_\" + a.anchor_id,\n            anchor_id: a.anchor_id,\n            tag_id: tag_id,\n            rssi: a.rssi,\n            adv_hz: 10,\n            seq: seq\n        }));\n\n    });\n});\n\nflow.set(\"seq\", seq);\n\nmsg.payload = output.join(\"\\n\");\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 2030,
+    "y": 440,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "2c0f5bc39b9bfb6d",
+    "type": "file",
+    "z": "tab_rtls",
+    "name": "rssi_engine_ble_mkgw3",
+    "filename": "/data/rssi_mkgw3.ndjson",
+    "filenameType": "str",
+    "appendNewline": true,
+    "createDir": false,
+    "overwriteFile": "false",
+    "encoding": "none",
+    "x": 1210,
+    "y": 180,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "b1725d4b068c778d",
+    "type": "debug",
+    "z": "tab_rtls",
+    "name": "debug 21",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 2320,
+    "y": 940,
+    "wires": []
+  },
+  {
+    "id": "65a89435c751b24d",
+    "type": "inject",
+    "z": "tab_rtls",
+    "name": "",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 300,
+    "y": 620,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "cdeeedead38720f6",
+    "type": "split",
+    "z": "tab_rtls",
+    "name": "",
+    "splt": "1",
+    "spltType": "len",
+    "arraySplt": 1,
+    "arraySpltType": "len",
+    "stream": false,
+    "addname": "",
+    "property": "payload",
+    "x": 1590,
+    "y": 760,
+    "wires": [
+      [
+        "8718bb5a92cf9bb8"
+      ]
+    ]
+  },
+  {
+    "id": "d79bdc1735c048b0",
+    "type": "function",
+    "z": "tab_rtls",
+    "name": "Unification",
+    "func": "let results = [];\n\n// -------- MKGW3 (JSON) --------\nif (msg.payload && typeof msg.payload === \"object\" && Array.isArray(msg.payload.data)) {\n\n    let gateway_mac = msg.topic.split(\"/\")[2].toLowerCase();\n\n    msg.payload.data.forEach(d => {\n        if (!d.mac || d.rssi === undefined) return;\n\n        results.push({\n            gateway_mac,\n            tag_mac: d.mac.toLowerCase().replace(/:/g, \"\"),\n            rssi: d.rssi,\n            ts: Date.now()\n        });\n    });\n}\n\n// -------- MKGW4 (BUFFER) --------\nelse if (Buffer.isBuffer(msg.payload)) {\n\n    const buf = msg.payload;\n\n    if (buf.readUInt8(0) !== 0xEF) return null;\n\n    const gateway_mac = buf.toString('hex', 3, 9).toLowerCase();\n    const length = buf.readUInt16BE(9);\n    const data = buf.subarray(11, 11 + length);\n\n    let i = 0;\n\n    while (i < data.length) {\n\n        let len = data.readUInt16BE(i + 1);\n        let value = data.subarray(i + 3, i + 3 + len);\n\n        if (len >= 7) {\n            results.push({\n                gateway_mac,\n                tag_mac: value.subarray(0, 6).toString('hex'),\n                rssi: value.readInt8(6),\n                ts: Date.now()\n            });\n        }\n\n        i += (3 + len);\n    }\n}\n\n// -------- SAFETY --------\nelse {\n    return null;\n}\n\nif (!results.length) return null;\n\nmsg.payload = results;\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 930,
+    "y": 440,
+    "wires": [
+      [
+        "a0c25d2ce444327a"
+      ]
+    ]
+  },
+  {
+    "id": "67e24d18d482c69f",
+    "type": "file",
+    "z": "tab_rtls",
+    "name": "ble_packets_mkgw3",
+    "filename": "/data/ble_packets_mkgw3.ndjson",
+    "filenameType": "str",
+    "appendNewline": true,
+    "createDir": false,
+    "overwriteFile": "false",
+    "encoding": "none",
+    "x": 2320,
+    "y": 440,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "eb31fd6f9f3a3cbc",
+    "type": "debug",
+    "z": "tab_rtls",
+    "name": "debug 31",
+    "active": false,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "false",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 790,
+    "y": 360,
+    "wires": []
+  },
+  {
+    "id": "df34137895c12f5b",
+    "type": "mqtt in",
+    "z": "tab_rtls",
+    "name": "MK107",
+    "topic": "MK107DPro/+/scanresults",
+    "qos": "1",
+    "datatype": "auto-detect",
+    "broker": "fab2cb4bc1d213cc",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 690,
+    "y": 760,
+    "wires": [
+      [
+        "12affdb4280a922c"
+      ]
+    ]
+  },
+  {
+    "id": "2cd5c0bd719dd025",
+    "type": "mqtt in",
+    "z": "tab_rtls",
+    "name": "MKGW4 IN",
+    "topic": "/MKGW4/c33ef91c9c9e/send",
+    "qos": "1",
+    "datatype": "auto-detect",
+    "broker": "94772904314c5aef",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 710,
+    "y": 600,
+    "wires": [
+      [
+        "f9f0200be3050acc"
+      ]
+    ]
+  },
+  {
+    "id": "f9f0200be3050acc",
+    "type": "function",
+    "z": "tab_rtls",
+    "name": "parseMessage",
+    "func": "const buffer = msg.payload;\nif (buffer.readUInt8(0) === 0xef) {\n    const code = buffer.readUInt16BE(1);\n    \n    const typeMap = {\n        0x3004: \"device_status\",\n        0x3006: \"firmware_ota_result\",\n        0x3010: \"power_disconnect_alarm\",\n        0x3011: \"low_battery_alarm\",\n        0x3014: \"restore_factory_default\",\n        0x3032: \"mqtt_certificate_download_result\",\n        0x3089: \"gnss\",\n        0x30a0: \"ble\",\n        0x30b1: \"buffered_gnss\",\n        0x30b2: \"buffered_ble\",\n        0x30b3: \"buffered_data\"\n    };\n    \n    const mac_addr = buffer.subarray(3, 9);\n    \n    msg.payload = {\n        gateway: mac_addr.toString('hex'),  \n        msg_type: typeMap[code] || \"unknown\",\n        msg_data: buffer.subarray(9)\n    };\n    \n    return msg;\n}\n\nreturn null;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 960,
+    "y": 600,
+    "wires": [
+      [
+        "5c53bde4fc8a3b43"
+      ]
+    ]
+  },
+  {
+    "id": "5c53bde4fc8a3b43",
+    "type": "switch",
+    "z": "tab_rtls",
+    "name": "",
+    "property": "payload.msg_type",
+    "propertyType": "msg",
+    "rules": [
+      {
+        "t": "eq",
+        "v": "gnss",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "ble",
+        "vt": "str"
+      }
+    ],
+    "checkall": "true",
+    "repair": false,
+    "outputs": 2,
+    "x": 1190,
+    "y": 600,
+    "wires": [
+      [],
+      [
+        "0e15df9850854e86"
+      ]
+    ]
+  },
+  {
+    "id": "12affdb4280a922c",
+    "type": "switch",
+    "z": "tab_rtls",
+    "name": "",
+    "property": "payload.msg_id",
+    "propertyType": "msg",
+    "rules": [
+      {
+        "t": "eq",
+        "v": "3070",
+        "vt": "num"
+      }
+    ],
+    "checkall": "true",
+    "repair": false,
+    "outputs": 1,
+    "x": 1130,
+    "y": 760,
+    "wires": [
+      [
+        "85bc093eadc11c68",
+        "a0ecda3a74d37ded"
+      ]
+    ]
+  },
+  {
+    "id": "8718bb5a92cf9bb8",
+    "type": "function",
+    "z": "tab_rtls",
+    "name": "Extract + Filter",
+    "func": "const TAGS = {\n  \"fc0e55cbcc75\": \"T1\",\n  \"f47f5bcc9fed\": \"T2\",\n  \"cac90c39716b\": \"T3\"\n};\n\n// 🔥 use saved gateway_mac\nlet gw = msg.gateway_mac;\n\nlet d = msg.payload;\n\n// safety check\nif (!d || !d.mac || d.rssi === undefined) return null;\n\nlet tag_mac = d.mac.toLowerCase().replace(/:/g,\"\");\n\n\nif (!TAGS[tag_mac]) return null;\n\nmsg.payload = {\n    gateway_mac: gw,\n    tag_id: TAGS[tag_mac],\n    rssi: d.rssi,\n    ts: Date.now()\n};\n\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1820,
+    "y": 760,
+    "wires": [
+      [
+        "ae172daa1fc884c3"
+      ]
+    ]
+  },
+  {
+    "id": "0e15df9850854e86",
+    "type": "function",
+    "z": "tab_rtls",
+    "name": "parseBeacon",
+    "func": "const beaconTypes = {\n    0: \"iBeacon\", \n\t1: \"Eddystone-UID\", \n\t2: \"Eddystone-URL\", \n\t3: \"Eddystone-TLM\",\n    4: \"BXP-Deviceinfo\", \n\t5: \"BXP-ACC\", \n\t6: \"BXP-TH\", \n\t7: \"BXP-Button\",\n    8: \"BXP-Tag\", \n\t9: \"PIR\", \n\t10: \"Other\", \n\t11: \"TOF\"\n};\n\nif (!msg.payload.msg_data) {\n    return null;\n}\n\nconst adv_len = msg.payload.msg_data.readUInt16BE(0);\nconst ble_adv = msg.payload.msg_data.subarray(2, 2 + adv_len);\n\nlet array_beacon = [];\n\ntry {\n    \n    let type = 0;\n    let beacon = { gateway: msg.payload.gateway };\n    let cursor = 0;\n    \n    while (cursor < ble_adv.length) {\n        const flag = ble_adv.readUInt8(cursor);\n        cursor += 1\n\n        if (flag == 0x0 && cursor > 1){\n            array_beacon.push(beacon);\n            beacon = { gateway: msg.payload.gateway };\n        }\n        \n        const segment_len = ble_adv.readUInt16BE(cursor);\n        cursor += 2;\n        const end_cursor = cursor + segment_len;\n        \n        if (end_cursor > ble_adv.length) break;\n\n        switch (flag) {\n            case 0x00:\n                type = ble_adv.readUInt8(cursor);\n                beacon.type = beaconTypes[type] || \"unknown\";\n                break;\n            case 0x01:\n                beacon.mac = ble_adv.subarray(cursor, end_cursor).toString('hex');\n                break;\n            case 0x02:\n                beacon.connectable = ble_adv.readUInt8(cursor);\n                break;\n            case 0x03:\n                beacon.timestamp = ble_adv.readUInt32BE(cursor);\n                break;\n            case 0x04:\n                beacon.rssi = ble_adv.readInt8(cursor);\n                break;\n\t\t\tcase 0x5:\n                beacon.raw_data = ble_adv.subarray(cursor, end_cursor);\n                break;\n            case 0x10:\n                beacon.accelerometer = {\n                    x: ble_adv.readInt16BE(cursor) / 16,\n                    y: ble_adv.readInt16BE(cursor + 2) / 16, \n                    z: ble_adv.readInt16BE(cursor + 4) / 16\n                }\n                break;\n        }\n        \n        cursor = end_cursor;\n    }\n    array_beacon.push(beacon);\n    \n    msg.payload = array_beacon;\n    \n} catch (error) {\n    msg.error = error.message;\n    node.error(\"Parsing error: \" + error.message);\n}\n\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1410,
+    "y": 600,
+    "wires": [
+      [
+        "ea3d783768b04e27"
+      ]
+    ]
+  },
+  {
+    "id": "ea3d783768b04e27",
+    "type": "function",
+    "z": "tab_rtls",
+    "name": "Map Beacon",
+    "func": "\n\nconst BEACON_MAP = {\n    \"fa9d445c7902\": \"B1\",\n    \"e5022a5f2b7c\": \"B2\",\n    \"ca7995a4a2d1\": \"B3\",\n    \"d16d0dd3da05\": \"B4\"\n};\n\nlet results = [];\n\nmsg.payload.forEach(p => {\n\n    let mac = p.mac?.toLowerCase().replace(/:/g, \"\");\n    if (!mac) return;\n\n    let beacon_id = BEACON_MAP[mac];\n    if (!beacon_id) return;  // ignore unknown devices\n\n    results.push({\n        beacon_id: beacon_id,\n        rssi: p.rssi,\n        ts: Date.now()\n    });\n\n});\n\nif (!results.length) return null;\n\nmsg.payload = results;\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1670,
+    "y": 600,
+    "wires": [
+      [
+        "f0bac47bbd573d5f"
+      ]
+    ]
+  },
+  {
+    "id": "f0bac47bbd573d5f",
+    "type": "function",
+    "z": "tab_rtls",
+    "name": "Formatter",
+    "func": "let seq = flow.get(\"seq_mkgw4\") || 0;\n\nlet session_id = \"S_2026_04_23\";\nlet run_id = \"R_MAIN_01\";\n\nlet output = [];\n\nmsg.payload.forEach(p => {\n\n    seq++;\n\n    output.push(JSON.stringify({\n        ts_gateway: new Date(p.ts).toISOString(),\n        session_id: session_id,\n        run_id: run_id,\n        system_type: \"mkgw4_mobile\",\n        gateway_id: \"GW_M1\",\n        beacon_id: p.beacon_id,\n        rssi: p.rssi,\n        seq: seq\n    }));\n\n});\n\nflow.set(\"seq_mkgw4\", seq);\n\nmsg.payload = output.join(\"\\n\");\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 2080,
+    "y": 600,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "099258d981df57e1",
+    "type": "file",
+    "z": "tab_rtls",
+    "name": "ble_packets_mkgw4",
+    "filename": "/data/ble_packets_mkgw4.ndjson",
+    "filenameType": "str",
+    "appendNewline": true,
+    "createDir": false,
+    "overwriteFile": "false",
+    "encoding": "none",
+    "x": 2320,
+    "y": 600,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "ae172daa1fc884c3",
+    "type": "function",
+    "z": "tab_rtls",
+    "name": "Anchor+ Format",
+    "func": "const MAP = {\n \"1c634990898c\": \"P1\",\n \"1c63498e8b1d\": \"P2\",\n \"1c63498f4ec7\": \"P3\",\n \"182c659c3e42\": \"P4\",\n \"1c63498f36ab\": \"P5\"\n};\n\nlet seq = flow.get(\"seq_plug\") || 0;\n\nlet anchor = MAP[msg.payload.gateway_mac];\nif (!anchor) return null;\n\nseq++;\n\nmsg.payload = JSON.stringify({\n    ts_gateway: new Date(msg.payload.ts).toISOString(),\n    session_id: \"S_2026_04_23\",\n    run_id: \"R_MAIN_01\",\n    system_type: \"mk107\",\n    gateway_id: \"GW_\" + anchor,\n    anchor_id: anchor,\n    tag_id: msg.payload.tag_id,\n    rssi: msg.payload.rssi,\n    seq: seq\n});\n\nflow.set(\"seq_plug\", seq);\n\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 2060,
+    "y": 760,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "85bc093eadc11c68",
+    "type": "debug",
+    "z": "tab_rtls",
+    "name": "debug 37",
+    "active": false,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "false",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 1220,
+    "y": 900,
+    "wires": []
+  },
+  {
+    "id": "a0ecda3a74d37ded",
+    "type": "function",
+    "z": "tab_rtls",
+    "name": "Save Gateway",
+    "func": "// Save gateway MAC\nmsg.gateway_mac = msg.payload.device_info.mac\n    ?.toLowerCase()\n    .replace(/:/g,\"\");\n\n// 🔥 IMPORTANT: isolate only data array\nmsg.payload = msg.payload.data;\n\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1380,
+    "y": 760,
+    "wires": [
+      [
+        "cdeeedead38720f6"
+      ]
+    ]
+  },
+  {
+    "id": "dd271aa7cf74fcdb",
+    "type": "mqtt out",
+    "z": "tab_rtls",
+    "name": "",
+    "topic": "debug/mk107",
+    "qos": "",
+    "retain": "",
+    "respTopic": "",
+    "contentType": "",
+    "userProps": "",
+    "correl": "",
+    "expiry": "",
+    "broker": "fab2cb4bc1d213cc",
+    "x": 2340,
+    "y": 840,
+    "wires": []
+  },
+  {
+    "id": "646a9761a712dcd6",
+    "type": "file",
+    "z": "tab_rtls",
+    "name": "ble_packets_plug",
+    "filename": "/data/ble_packets_plug.ndjson",
+    "filenameType": "str",
+    "appendNewline": true,
+    "createDir": false,
+    "overwriteFile": "false",
+    "encoding": "none",
+    "x": 2310,
+    "y": 760,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "8cea08f3a740d3f8",
+    "type": "function",
+    "z": "tab_rtls",
+    "name": "Calibrartion Formatter MKGW3",
+    "func": "const tagMap = {\n    \"fc0e55cbcc75\": \"T1\",\n    \"f47f5bcc9fed\": \"T2\",\n    \"cac90c39716b\": \"T3\"\n};\n\n// 🔥 FIXED SETTINGS (for calibration)\nlet session_id = \"S_2026_04_23\";   // change per day\nlet distance_m = 2.0;              // 🔥 YOU ARE AT 1m NOW\n\nlet output = [];\n\nmsg.payload.forEach(entry => {\n\n    let tag_id = tagMap[entry.tag_mac] || entry.tag_mac;\n\n    entry.anchors.forEach(a => {\n\n        output.push(JSON.stringify({\n            ts: new Date(entry.ts).toISOString(),   // 🔥 required field name = ts\n            session_id: session_id,\n            system_type: \"mkgw3_fixed\",\n            gateway_id: \"GW_\" + a.anchor_id,\n            tag_id: tag_id,\n            distance_m: distance_m,   // 🔥 IMPORTANT\n            rssi: a.rssi\n        }));\n\n    });\n});\n\nmsg.payload = output.join(\"\\n\");\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1850,
+    "y": 380,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "42e56c8d46b1485f",
+    "type": "file",
+    "z": "tab_rtls",
+    "name": "mkgw3 calibration",
+    "filename": "/data/mkgw3_calibration.ndjson",
+    "filenameType": "str",
+    "appendNewline": true,
+    "createDir": false,
+    "overwriteFile": "false",
+    "encoding": "none",
+    "x": 3070,
+    "y": 220,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "a431f4e219713a0d",
+    "type": "function",
+    "z": "tab_rtls",
+    "name": "Calibration Formatter Mkgw4",
+    "func": "// 🔥 MKGW4 Calibration Formatter (1m)\n\nlet session_id = \"S_2026_04_23\";\nlet distance_m = 1.0;\n\nlet output = [];\n\nmsg.payload.forEach(p => {\n\n    output.push(JSON.stringify({\n        ts: new Date(p.ts).toISOString(),\n        session_id: session_id,\n        system_type: \"mkgw4_mobile\",\n        gateway_id: \"GW_M1\",\n        tag_id: p.beacon_id,   // 🔥 treat beacon as tag\n        distance_m: distance_m,\n        rssi: p.rssi\n    }));\n\n});\n\nmsg.payload = output.join(\"\\n\");\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1840,
+    "y": 540,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "158c4c64e1dafda8",
+    "type": "file",
+    "z": "tab_rtls",
+    "name": "MKGW4 Calibration",
+    "filename": "/data/mkgw4_calibration.ndjson",
+    "filenameType": "str",
+    "appendNewline": true,
+    "createDir": false,
+    "overwriteFile": "false",
+    "encoding": "none",
+    "x": 3040,
+    "y": 480,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "9a0afc8b535cbbcc",
+    "type": "function",
+    "z": "tab_rtls",
+    "name": "Calibration Fomatter MK107D",
+    "func": "const MAP = {\n \"1c634990898c\": \"P1\",\n \"1c63498e8b1d\": \"P2\",\n \"1c63498f4ec7\": \"P3\",\n \"182c659c3e42\": \"P4\",\n \"1c63498f36ab\": \"P5\"\n};\n\nlet anchor = MAP[msg.payload.gateway_mac];\nif (!anchor) return null;\n\n// 🔥 calibration distance (change manually)\nlet distance_m = 1.0;\n\nmsg.payload = JSON.stringify({\n    ts: new Date(msg.payload.ts).toISOString(),   // 🔥 NOTE: ts (not ts_gateway)\n    session_id: \"S_2026_04_23\",\n    system_type: \"mk107\",\n    gateway_id: \"GW_\" + anchor,\n    tag_id: msg.payload.tag_id,\n    distance_m: distance_m,   // 🔥 NEW FIELD\n    rssi: msg.payload.rssi\n});\n\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1850,
+    "y": 700,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "a06cc49461555abc",
+    "type": "file",
+    "z": "tab_rtls",
+    "name": "MK107_calibration",
+    "filename": "/data/mk107_calibration.ndjson",
+    "filenameType": "str",
+    "appendNewline": true,
+    "createDir": false,
+    "overwriteFile": "false",
+    "encoding": "none",
+    "x": 3050,
+    "y": 880,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "a632a735aadb90e7",
+    "type": "mqtt out",
+    "z": "tab_rtls",
+    "name": "",
+    "topic": "debug/out",
+    "qos": "",
+    "retain": "",
+    "respTopic": "",
+    "contentType": "",
+    "userProps": "",
+    "correl": "",
+    "expiry": "",
+    "broker": "fab2cb4bc1d213cc",
+    "x": 2400,
+    "y": 380,
+    "wires": []
+  },
+  {
+    "id": "fab2cb4bc1d213cc",
+    "type": "mqtt-broker",
+    "name": "mqtt",
+    "broker": "<host>",
+    "port": "1883",
+    "clientid": "",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "4",
+    "keepalive": "60",
+    "cleansession": true,
+    "autoUnsubscribe": true,
+    "birthTopic": "",
+    "birthQos": "0",
+    "birthRetain": "false",
+    "birthPayload": "",
+    "birthMsg": {},
+    "closeTopic": "",
+    "closeQos": "0",
+    "closeRetain": "false",
+    "closePayload": "",
+    "closeMsg": {},
+    "willTopic": "",
+    "willQos": "0",
+    "willRetain": "false",
+    "willPayload": "",
+    "willMsg": {},
+    "userProps": "",
+    "sessionExpiry": ""
+  },
+  {
+    "id": "94772904314c5aef",
+    "type": "mqtt-broker",
+    "name": "Moko",
+    "broker": "<host>",
+    "port": "1883",
+    "clientid": "",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "4",
+    "keepalive": "60",
+    "cleansession": true,
+    "autoUnsubscribe": true,
+    "birthTopic": "",
+    "birthQos": "0",
+    "birthRetain": "false",
+    "birthPayload": "",
+    "birthMsg": {},
+    "closeTopic": "",
+    "closeQos": "0",
+    "closeRetain": "false",
+    "closePayload": "",
+    "closeMsg": {},
+    "willTopic": "",
+    "willQos": "0",
+    "willRetain": "false",
+    "willPayload": "",
+    "willMsg": {},
+    "userProps": "",
+    "sessionExpiry": ""
+  }
+]

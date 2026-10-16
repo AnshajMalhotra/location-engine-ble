@@ -1,0 +1,14 @@
+{
+  "runs": [
+    {
+      "run_id": "R_L_01",
+      "route_type": "LOS",
+      "duration_sec": 288,
+      "waypoints": [
+        [5.41, -1.51],
+        [-4.56, 5.60]
+      ],
+      "repeat_index": 5
+    }
+  ]
+}
